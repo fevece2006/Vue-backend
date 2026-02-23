@@ -2,6 +2,7 @@ package com.example.mantenimiento.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -28,7 +29,11 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            .cors(cors -> {})
             .authorizeHttpRequests(authz -> authz
+                // Permitir preflight OPTIONS en todos lados
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Rutas públicas
                 .requestMatchers(
                     "/login",
                     "/users/register",
@@ -38,6 +43,9 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/swagger-ui/**"
                 ).permitAll()
+                // GET en categorías y productos - permitido sin autenticación
+                .requestMatchers(HttpMethod.GET, "/categories/**", "/products/**").permitAll()
+                // Resto de solicitudes requieren autenticación
                 .anyRequest().authenticated()
             )
             .httpBasic(httpBasic -> httpBasic.disable())

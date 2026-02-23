@@ -333,11 +333,86 @@ public class ProductEntityMapper {
 
 Configuración del sistema y aspectos transversales:
 
-- `config/SecurityConfig.java` - Configuración de Spring Security.
+- `config/SecurityConfig.java` - Autorización y validación JWT.
+- `config/WebConfig.java` - Configuración de CORS.
 - `config/JwtUtil.java` - Utilidad para generar/validar tokens JWT.
 - `config/JwtAuthFilter.java` - Filtro para autenticación JWT.
 - `config/OpenApiConfig.java` - Configuración de Swagger/OpenAPI.
 - `config/GlobalExceptionHandler.java` - Manejo centralizado de excepciones.
+
+#### WebConfig - CORS Configuration
+
+Habilita solicitudes cross-origin desde dominios frontend confiables:
+
+```java
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOrigins(
+                    "http://localhost",
+                    "http://localhost:3000",    // React
+                    "http://localhost:4200",    // Angular
+                    "http://localhost:5173",    // Vite
+                    "http://127.0.0.1",
+                    "http://127.0.0.1:3000",
+                    "http://127.0.0.1:4200",
+                    "http://127.0.0.1:5173"
+                )
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
+                .allowedHeaders("*")
+                .exposedHeaders("Authorization")  // Frontend puede leer JWT token
+                .allowCredentials(true)
+                .maxAge(3600);  // Preflight cache 1 hour
+    }
+}
+```
+
+**Puntos clave:**
+- Permite solicitudes `OPTIONS` (preflight CORS) desde frontend.
+- Expone header `Authorization` para que el frontend pueda acceder al token JWT.
+- Soporta puertos comunes de desarrollo (3000 React, 4200 Angular, 5173 Vite).
+- Para producción, actualizar `allowedOrigins` con dominios reales.
+
+#### SecurityConfig - JWT Authentication & Authorization
+
+Define qué rutas requieren autenticación y cuáles son públicas:
+
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> {})  // Habilita CORS
+            .authorizeHttpRequests(authz -> authz
+                // Permitir preflight OPTIONS en todos lados
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Rutas públicas
+                .requestMatchers("/login", "/users/register", "/v3/api-docs/**", 
+                                "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                // GET en categorías y productos - permitido sin autenticación
+                .requestMatchers(HttpMethod.GET, "/categories/**", "/products/**").permitAll()
+                // Resto de solicitudes requieren autenticación
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+}
+```
+
+**Flujo de autenticación JWT:**
+
+1. Cliente envía credenciales → `POST /login`
+2. Servidor valida y genera token JWT (expiración 15 minutos)
+3. Cliente envía token en header: `Authorization: Bearer <token>`
+4. `JwtAuthFilter` valida el token en cada solicitud
+5. Token válido → Solicitud procede a controller con contexto autenticado
+6. Token inválido/expirado → `401 Unauthorized`
 
 #### GlobalExceptionHandler
 

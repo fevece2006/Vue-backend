@@ -5,11 +5,290 @@ This document provides tested examples for all endpoints in the Mantenimiento Pr
 
 **Base URL:** `http://localhost:8080`
 
-**Authentication:** JWT Bearer token required for all endpoints except `/users/register` and `/login`
+**Authentication:** JWT Bearer token required for protected endpoints (POST/PUT/DELETE)
+
+**CORS:** Enabled for localhost on common development ports (3000, 4200, 5173)
 
 ---
 
-## Prerequisites
+## Frontend Integration (JavaScript/Fetch)
+
+### 1. Register User
+```javascript
+const registerResponse = await fetch('http://localhost:8080/users/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        username: 'testuser',
+        password: 'testpass123',
+        role: 'ROLE_USER'
+    })
+});
+const user = await registerResponse.json();
+```
+
+### 2. Login
+```javascript
+const loginResponse = await fetch('http://localhost:8080/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        username: 'testuser',
+        password: 'testpass123'
+    })
+});
+const { token } = await loginResponse.json();
+console.log('JWT Token:', token);
+
+// Store token in localStorage for future requests
+localStorage.setItem('authToken', token);
+```
+
+### 3. Get Categories (Public - No Auth Required)
+```javascript
+const categoriesResponse = await fetch('http://localhost:8080/categories', {
+    method: 'GET'
+});
+const categories = await categoriesResponse.json();
+```
+
+### 4. Create Category (With JWT Token)
+```javascript
+const token = localStorage.getItem('authToken');
+
+const createResponse = await fetch('http://localhost:8080/categories', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+        name: 'Electronics'
+    })
+});
+const category = await createResponse.json();
+```
+
+### 5. Create Product with Category (With JWT Token)
+```javascript
+const token = localStorage.getItem('authToken');
+const categoryId = 'a8092c78-726a-4afb-935c-860d796b31e8'; // from step 4
+
+const createResponse = await fetch('http://localhost:8080/products', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+        name: 'Wireless Mouse',
+        description: 'Ergonomic wireless mouse',
+        price: 29.99,
+        categoryId: categoryId
+    })
+});
+const product = await createResponse.json();
+```
+
+### React Example Hook
+```javascript
+import { useState, useEffect } from 'react';
+
+function useApi() {
+    const [token, setToken] = useState(localStorage.getItem('authToken'));
+    
+    const apiCall = async (endpoint, method = 'GET', body = null) => {
+        const options = {
+            method,
+            headers: { 'Content-Type': 'application/json' }
+        };
+        
+        if (token) {
+            options.headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        if (body) {
+            options.body = JSON.stringify(body);
+        }
+        
+        const response = await fetch(`http://localhost:8080${endpoint}`, options);
+        
+        if (response.status === 401) {
+            // Token expired or invalid
+            localStorage.removeItem('authToken');
+            setToken(null);
+            throw new Error('Authentication failed');
+        }
+        
+        return response.json();
+    };
+    
+    return { apiCall, token, setToken };
+}
+```
+
+---
+
+## API Endpoints Summary (All Routes by Role)
+
+### 📋 Quick Reference Table
+
+| Endpoint | Method | Public | ROLE_USER | ROLE_ADMIN | Description |
+|----------|--------|--------|-----------|-----------|-------------|
+| `/login` | POST | ✅ | - | - | Login and get JWT token |
+| `/users/register` | POST | ✅ | - | - | Register new user account |
+| **Categories** |
+| `/categories` | GET | ✅ | ✅ | ✅ | List all categories |
+| `/categories` | POST | ❌ | ✅ | ✅ | Create category |
+| `/categories/{id}` | GET | ✅ | ✅ | ✅ | Get category by ID |
+| `/categories/{id}` | PUT | ❌ | ✅ | ✅ | Update category |
+| `/categories/{id}` | DELETE | ❌ | ✅ | ✅ | Delete category |
+| **Products** |
+| `/products` | GET | ✅ | ✅ | ✅ | List all products |
+| `/products` | POST | ❌ | ✅ | ✅ | Create product |
+| `/products/{id}` | GET | ✅ | ✅ | ✅ | Get product by ID |
+| `/products/{id}` | PUT | ❌ | ✅ | ✅ | Update product |
+| `/products/{id}` | DELETE | ❌ | ✅ | ✅ | Delete product |
+
+### 🔓 Public Endpoints (No Authentication)
+
+These endpoints work **without** JWT token:
+
+```javascript
+// Available to everyone
+const publicEndpoints = [
+    { method: 'POST', path: '/login' },
+    { method: 'POST', path: '/users/register' },
+    { method: 'GET', path: '/categories' },
+    { method: 'GET', path: '/categories/:id' },
+    { method: 'GET', path: '/products' },
+    { method: 'GET', path: '/products/:id' }
+];
+
+// Example: Get products without login
+const products = await fetch('http://localhost:8080/products');
+const data = await products.json();
+```
+
+### 🔐 Protected Endpoints (Requires JWT Token)
+
+These endpoints require authentication. Send JWT token in header:
+
+```javascript
+const token = localStorage.getItem('authToken');
+const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+};
+
+// Create category (ROLE_USER and ROLE_ADMIN allowed)
+const response = await fetch('http://localhost:8080/categories', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ name: 'Electronics' })
+});
+```
+
+**Protected Operations:**
+- ✅ `POST /categories` - Create
+- ✅ `PUT /categories/{id}` - Update
+- ✅ `DELETE /categories/{id}` - Delete
+- ✅ `POST /products` - Create
+- ✅ `PUT /products/{id}` - Update
+- ✅ `DELETE /products/{id}` - Delete
+
+### 👤 User Roles Explained
+
+#### ROLE_USER (Default User)
+- Can **read** categories and products (GET)
+- Can **create, update, delete** their own categories and products
+- Default role for new registrations
+
+```javascript
+// User workflow
+// 1. Register with default ROLE_USER
+await fetch('http://localhost:8080/users/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        username: 'john',
+        password: 'secure123',
+        role: 'ROLE_USER'  // Optional, will default to ROLE_USER
+    })
+});
+
+// 2. Login to get token
+const login = await fetch('http://localhost:8080/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        username: 'john',
+        password: 'secure123'
+    })
+});
+const { token } = await login.json();
+
+// 3. Can create categories with token
+const category = await fetch('http://localhost:8080/categories', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ name: 'My Category' })
+});
+```
+
+#### ROLE_ADMIN (Administrator)
+- Same permissions as **ROLE_USER**
+- Full system access (manage all categories and products)
+- Default admin user available in database
+
+```javascript
+// Admin workflow (use default admin or register)
+// Default admin credentials:
+// username: admin
+// password: password
+// role: ROLE_ADMIN
+
+const adminLogin = await fetch('http://localhost:8080/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        username: 'admin',
+        password: 'password'
+    })
+});
+const { token } = await adminLogin.json();
+
+// Admin can do everything
+const product = await fetch('http://localhost:8080/products', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+        name: 'Server Admin Product',
+        description: 'Created by admin',
+        price: 99.99,
+        categoryId: 'category-uuid'
+    })
+});
+```
+
+### ⚠️ Common Errors by Role/Permission
+
+| Error | Status | Cause | Solution |
+|-------|--------|-------|----------|
+| No token | `401` | Missing `Authorization` header | Add JWT token to header |
+| Invalid token | `401` | Malformed or expired token | Login again to get fresh token |
+| Token expired | `401` | Token older than 15 minutes | Login again |
+| Method not allowed | `403` | Insufficient permissions | Check user role |
+| Not found | `404` | Resource doesn't exist | Verify ID is correct |
+| Bad request | `400` | Invalid input data | Check validation constraints |
+
+---
 
 Start the application with Docker:
 ```powershell

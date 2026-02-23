@@ -70,19 +70,19 @@ Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/categories' -Headers 
 - `POST /login` - Login and receive JWT token
 - `POST /users/register` - Register new user
 
-### Categories (Requires JWT)
-- `GET /categories` - List all categories
-- `POST /categories` - Create category
-- `GET /categories/{id}` - Get category by ID
-- `PUT /categories/{id}` - Update category
-- `DELETE /categories/{id}` - Delete category
+### Categories
+- `GET /categories` - List all categories (public)
+- `POST /categories` - Create category (requires JWT)
+- `GET /categories/{id}` - Get category by ID (public)
+- `PUT /categories/{id}` - Update category (requires JWT)
+- `DELETE /categories/{id}` - Delete category (requires JWT)
 
-### Products (Requires JWT)  
-- `GET /products` - List all products
-- `POST /products` - Create product
-- `GET /products/{id}` - Get product by ID
-- `PUT /products/{id}` - Update product
-- `DELETE /products/{id}` - Delete product
+### Products
+- `GET /products` - List all products (public)
+- `POST /products` - Create product (requires JWT)
+- `GET /products/{id}` - Get product by ID (public)
+- `PUT /products/{id}` - Update product (requires JWT)
+- `DELETE /products/{id}` - Delete product (requires JWT)
 
 ### HTTP Status Codes
 
@@ -112,6 +112,35 @@ Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/categories' -Headers 
 ---
 
 ## Configuration
+
+### CORS (Cross-Origin Resource Sharing)
+
+The application is configured to accept requests from frontend applications on localhost with common development ports:
+
+**Allowed Origins:**
+- `http://localhost` (port 80)
+- `http://localhost:3000` (React default)
+- `http://localhost:4200` (Angular default)
+- `http://localhost:5173` (Vite default)
+- `http://127.0.0.1` and variants
+
+**Configuration:** See [WebConfig.java](src/main/java/com/example/mantenimiento/config/WebConfig.java)
+
+For production, update the allowed origins in `WebConfig.java`.
+
+### Security
+
+**Public Endpoints:**
+- `/login` - Authentication
+- `/users/register` - Registration
+- `GET /categories` and `GET /products` - Read access
+- Preflight requests (`OPTIONS`) on all routes
+
+**Protected Endpoints:**
+- `POST/PUT/DELETE` on categories and products require JWT token
+- Add `Authorization: Bearer <token>` header to requests
+
+**Configuration:** See [SecurityConfig.java](src/main/java/com/example/mantenimiento/config/SecurityConfig.java)
 
 ### Environment Variables (docker-compose.yml)
 - `SPRING_DATASOURCE_URL` - Database JDBC URL
