@@ -33,18 +33,18 @@ public class SecurityConfig {
             .authorizeHttpRequests(authz -> authz
                 // Permitir preflight OPTIONS en todos lados
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Rutas públicas
-                .requestMatchers(
-                    "/login",
-                    "/users/register",
+                // Permitir POST en login y register (rutas autenticación)
+                .requestMatchers(HttpMethod.POST, "/login", "/users/register").permitAll()
+                // Rutas públicas GET
+                .requestMatchers(HttpMethod.GET, 
                     "/actuator/**",
                     "/error",
                     "/v3/api-docs/**",
                     "/swagger-ui.html",
-                    "/swagger-ui/**"
+                    "/swagger-ui/**",
+                    "/categories/**",
+                    "/products/**"
                 ).permitAll()
-                // GET en categorías y productos - permitido sin autenticación
-                .requestMatchers(HttpMethod.GET, "/categories/**", "/products/**").permitAll()
                 // Resto de solicitudes requieren autenticación
                 .anyRequest().authenticated()
             )
